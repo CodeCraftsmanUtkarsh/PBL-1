@@ -1,120 +1,192 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8" />
   <title>Admin Voting Panel</title>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-      padding: 40px;
-      display: flex;
-      justify-content: center;
-    }
-
-    .container {
-      background: white;
-      padding: 25px;
-      border-radius: 10px;
-      width: 450px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    h2 {
-      margin-top: 0;
-      color: #333;
-      text-align: center;
-    }
-
-    #account {
-      font-size: 12px;
-      color: gray;
-      margin-bottom: 15px;
-      word-break: break-all;
-    }
-
-    .input-group {
-      display: flex;
-      margin-bottom: 15px;
-    }
-
-    input {
-      padding: 8px;
-      flex: 1;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-
-    button {
-      padding: 8px 12px;
-      cursor: pointer;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      margin-left: 8px;
-    }
-
-    button:hover {
-      background-color: #45a049;
-    }
-
-    .candidate-section {
-      margin-top: 20px;
-    }
-
-    ul {
-      padding-left: 0;
-    }
-
-    li {
-      list-style: none;
-      padding: 10px;
-      margin-bottom: 8px;
-      background-color: #f9f9f9;
-      border-radius: 6px;
-      border: 1px solid #ddd;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .candidate-name {
-      font-weight: bold;
-    }
-
-    .vote-count {
-      background: #4CAF50;
-      color: white;
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-    }
-
-  </style>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.10.0/dist/ethers.umd.min.js"></script>
 </head>
 
 <body>
 
-<div class="container">
-  <h2>Admin Voting Panel</h2>
+<h2>Admin Voting Panel</h2>
 
-  <button onclick="connectWallet()">Connect MetaMask</button>
-  <p id="account"></p>
+<button onclick="connectWallet()">Connect Wallet</button>
 
-  <div class="input-group">
-    <input id="candidateName" placeholder="Candidate name">
-    <button onclick="addCandidate()">Add</button>
-  </div>
+<hr/>
 
-  <div class="candidate-section">
-    <h3>Candidates</h3>
-    <ul id="candidateList"></ul>
-  </div>
-</div>
+<h3>Create Election</h3>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
-<script src="app.js"></script>
+<input id="eName" placeholder="Election name"/>
+<input id="start" type="datetime-local"/>
+<input id="end" type="datetime-local"/>
+<button onclick="createElection()">Create Election</button>
+
+<hr/>
+
+<h3>Select Election</h3>
+
+<select id="electionSelect"></select>
+<button onclick="loadElections()">Refresh Elections</button>
+
+<hr/>
+
+<h3>Add Candidate</h3>
+
+<input id="candidate" placeholder="Candidate name"/>
+<button onclick="addCandidate()">Add Candidate</button>
+
+<hr/>
+
+<h3>Candidates of Selected Election</h3>
+<button onclick="loadCandidates()">Load Candidates</button>
+<ul id="candidateList"></ul>
+
+<pre id="output"></pre>
+
+<script>
+let provider;
+let signer;
+let contract;
+
+const contractAddress = "0x12D19B9bFA10eb91CE4E5C614f107cCCdA42B894";
+
+const abi = [
+  "function createElection(string,uint,uint)",
+  "function getElectionCount() view returns(uint)",
+  "function getElection(uint) view returns(string,uint,uint)",
+  "function addCandidate(uint,string)",
+  "function getCandidateCount(uint) view returns(uint)",
+  "function getCandidate(uint,uint) view returns(string)"
+];
+
+async function connectWallet(){
+
+  if(!window.ethereum){
+    alert("Install MetaMask");
+    return;
+  }
+
+  await window.ethereum.request({ method:"eth_requestAccounts" });
+
+  provider = new ethers.BrowserProvider(window.ethereum);
+  signer = await provider.getSigner();
+  contract = new ethers.Contract(contractAddress, abi, signer);
+
+  const addr = await signer.getAddress();
+  output("Wallet connected: "+addr);
+}
+
+function toTimestamp(value){
+  if(!value) return 0;
+  return Math.floor(new Date(value).getTime()/1000);
+}
+
+async function createElection(){
+
+  if(!contract) return alert("Connect wallet");
+
+  const name = document.getElementById("eName").value;
+  const startVal = document.getElementById("start").value;
+  const endVal = document.getElementById("end").value;
+
+  if(!name || !startVal || !endVal){
+    alert("Fill all fields");
+    return;
+  }
+
+  const start = toTimestamp(startVal);
+  const end = toTimestamp(endVal);
+
+  try{
+    const tx = await contract.createElection(name,start,end);
+    await tx.wait();
+
+    output("Election created");
+    loadElections();
+
+  }catch(e){
+    console.error(e);
+    alert(e.reason || e.message);
+  }
+}
+
+async function loadElections(){
+
+  if(!contract) return;
+
+  const count = await contract.getElectionCount();
+  const select = document.getElementById("electionSelect");
+
+  select.innerHTML="";
+
+  for(let i=0;i<count;i++){
+    const e = await contract.getElection(i);
+    const opt=document.createElement("option");
+    opt.value=i;
+    opt.text=`${i} - ${e[0]}`;
+    select.appendChild(opt);
+  }
+}
+
+async function addCandidate(){
+
+  if(!contract) return alert("Connect wallet");
+
+  const id=document.getElementById("electionSelect").value;
+  const name=document.getElementById("candidate").value;
+
+  if(name===""){
+    alert("Enter candidate name");
+    return;
+  }
+
+  try{
+    const tx=await contract.addCandidate(id,name);
+    await tx.wait();
+
+    output("Candidate added");
+    loadCandidates();   // ⭐ auto refresh
+
+  }catch(e){
+    console.error(e);
+    alert(e.reason || e.message);
+  }
+}
+
+async function loadCandidates(){
+
+  if(!contract) return alert("Connect wallet");
+
+  const id=document.getElementById("electionSelect").value;
+  const list=document.getElementById("candidateList");
+
+  list.innerHTML="";
+
+  try{
+    const count=await contract.getCandidateCount(id);
+
+    if(count==0){
+      list.innerHTML="<li>No candidates yet</li>";
+      return;
+    }
+
+    for(let i=0;i<count;i++){
+      const name=await contract.getCandidate(id,i);
+
+      const li=document.createElement("li");
+      li.innerText=name;
+      list.appendChild(li);
+    }
+
+  }catch(e){
+    console.error(e);
+  }
+}
+
+function output(msg){
+  document.getElementById("output").innerText=msg;
+}
+</script>
 
 </body>
 </html>

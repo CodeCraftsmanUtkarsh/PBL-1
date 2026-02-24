@@ -2,12 +2,15 @@ let provider;
 let signer;
 let contract;
 
-const contractAddress = "0xe042F2F86e076157Da3F5AC5Ee10D1524684cD01";
+const contractAddress = "0x1e8C45a08Ffb0398228A1725253f6DD7d13a2F5A";
 
 const abi = [
-  "function addCandidate(string memory _name) public",
-  "function candidateCount() view returns (uint)",
-  "function candidates(uint) view returns (uint id, string name, uint voteCount)"
+  "function createElection(string,uint,uint)",
+  "function getElectionCount() view returns(uint)",
+  "function getElection(uint) view returns(string,uint,uint)",
+  "function addCandidate(uint,string)",
+  "function getCandidateCount(uint) view returns(uint)",
+  "function getCandidate(uint,uint) view returns(string)"
 ];
 
 async function connectWallet() {
@@ -15,60 +18,54 @@ async function connectWallet() {
     alert("Install MetaMask");
     return;
   }
-  provider = new ethers.providers.Web3Provider(window.ethereum);
-  await provider.send("eth_requestAccounts", []);
-  signer = provider.getSigner();
 
-  const account = await signer.getAddress();
-  document.getElementById("account").innerText =
-    "Connected: " + account;
-
+  provider = new ethers.BrowserProvider(window.ethereum);
+  signer = await provider.getSigner();
   contract = new ethers.Contract(contractAddress, abi, signer);
 
-  await loadCandidates();
+  console.log("Wallet connected");
 }
 
-async function addCandidate() {
-  if (!contract) {
-    alert("Connect wallet first");
-    return;
-  }
+function toTimestamp(value){
+  return Math.floor(new Date(value).getTime()/1000);
+}
 
-  const name = document.getElementById("candidateName").value;
+async function createElection(){
 
-  if (!name) {
-    alert("Enter candidate name");
-    return;
-  }
+  if(!contract) return alert("Connect wallet");
 
-  try {
-    const tx = await contract.addCandidate(name);
-    await tx.wait();
+  const name = document.getElementById("eName").value;
+  const start = toTimestamp(document.getElementById("start").value);
+  const end = toTimestamp(document.getElementById("end").value);
 
-    document.getElementById("candidateName").value = "";
+  const tx = await contract.createElection(name,start,end);
+  await tx.wait();
 
-    await loadCandidates();
-  } catch (err) {
-    console.error(err);
-    alert(err.reason || err.message);
+  alert("Election created");
+}
+
+async function loadElections(){
+
+  const count = await contract.getElectionCount();
+  const select = document.getElementById("electionSelect");
+  select.innerHTML="";
+
+  for(let i=0;i<count;i++){
+    const e = await contract.getElection(i);
+    const opt=document.createElement("option");
+    opt.value=i;
+    opt.text=`${i} - ${e[0]}`;
+    select.appendChild(opt);
   }
 }
 
-async function loadCandidates() {
-  if (!contract) return;
+async function addCandidate(){
 
-  const count = await contract.candidateCount();
-  const list = document.getElementById("candidateList");
-  list.innerHTML = "";
+  const id=document.getElementById("electionSelect").value;
+  const name=document.getElementById("candidate").value;
 
-  for (let i = 1; i <= count; i++) {
-    const candidate = await contract.candidates(i);
+  const tx=await contract.addCandidate(id,name);
+  await tx.wait();
 
-    const li = document.createElement("li");
-    li.innerHTML =
-      "<strong>" + candidate.id + ". " + candidate.name + "</strong>" +
-      " | Votes: " + candidate.voteCount;
-
-    list.appendChild(li);
-  }
+  alert("Candidate added");
 }
