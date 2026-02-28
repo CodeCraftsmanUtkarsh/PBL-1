@@ -1,1 +1,78 @@
-npx hardhat run scripts/deploy.js --network ganache
+how to open:
+start ganache
+then npx hardhat compile (converts solidity to bytecode)
+(The contract is simply waiting locally until deployment sends it to blockchain.)
+then deploy that contract on the ganache network by: npx hardhat run scripts/deploy.js --network ganache
+Copy contract address → index.html
+Because frontend needs contract location.
+then npx serve
+then for 2nd time:
+npx serve
+
+blockchain->distributed database unlike traditional centralized dba (that can be hacked, (one owner),etc)
+blockchain dba-> stores data in blocks (linked using cryptography)
+each block contains data(container of transactions), timestamp, hash(digital footprint), previous block hash
+node-> computer running the blockchain (thousands of computer store same data ), (ganache acts as node)
+ledger=record book
+blockchain = distributed ledger
+transactions: signed request to change blockchain state
+wallet=identity that signs transaction(metamask)
+consensus = agreement (only valid transactions are added)
+PoS (used in ethereum): (ganache implements it automatically)
+PoW(used in bitcoin)
+smart contract: enforces rules and replaces backend server (voting.sol)
+Normal app: FE->BE->DBA
+Our app: FE->Smart contract->Blockchain
+ethereum : blockhain platform: used to execute contracts, building dApps
+types of accounts on ethereum:
+1. Externally Owned Accounts(EOA):
+normal wallet
+admin account = eoa
+2. Contract account:
+smart contract
+cannot initiate transactions by itself
+
+relationship between accounts :
+EOA->sends transaction to -> contract account
+
+transactions:
+add candidate
+why are transactions signed?
+metamask signs transactions (authorized and authenticity)
+
+Gas:
+fee required to execute operations on ethereum = cost of computation (reading data does not cost gas)
+
+smart contract execution:
+deployment utilities(helper functions) by hardhat(development framework) deploy:
+compile solidity
+send bytecode to blockchain 
+
+State=current data stored on blockchain
+
+ABI=Application Binary Interface (without this UI cant call contract)
+
+Ganache:
+creates local blockchain on computer:
+1. Blocks are created locally
+2. Transactions are mined instantly
+3. Fake ETH is provided
+4. Test accounts are generated
+
+Ethers.js:
+bridge b/w FE and blockchain.
+ethers provides:
+1. Contract object
+2. ABI usage
+3. Wallet connection
+4. Transaction creation
+
+Project:
+You created a smart contract, deployed it to a local blockchain, and built a web interface that interacts with it through a wallet.
+
+
+Layers:
+L1: (Layer 1) : main blockchain (Ethereum ,Solana)
+L2: (Layer 2): scaling solution built on top of L1 (polygon , optimism)
+
+DAO (Decentralized autonomous organization): governance systems
