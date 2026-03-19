@@ -34,7 +34,9 @@ contract Voting {
     // ===== PRN SYSTEM =====
 
     mapping(bytes32 => bool) public validPRN;         // Whitelisted PRNs
-    mapping(address => bytes32) public registeredPRN; // Wallet → PRN
+    mapping(address => bytes32) public registeredPRN; // Wallet → PRN //this prevents one wallet -> multiple PRNs
+    mapping(bytes32 => bool) public prnUsed; // this prevents one PRN -> multiple wallets
+    //Anyone who knows a PRN can claim and control it.
 
     // ===== ADMIN FUNCTIONS =====
 
@@ -78,11 +80,13 @@ contract Voting {
     // ===== STUDENT FUNCTIONS =====
 
     function register(bytes32 _hashedPRN) public {
-
+        
         require(validPRN[_hashedPRN], "PRN not valid");
         require(registeredPRN[msg.sender] == 0, "Wallet already registered");
+        require(!prnUsed[_hashedPRN], "PRN already used");
 
-        registeredPRN[msg.sender] = _hashedPRN;
+        registeredPRN[msg.sender] = _hashedPRN; //msg.sender is the wallet address (more precisely, the caller’s address).
+        prnUsed[_hashedPRN] = true;
     }
 
     function vote(
