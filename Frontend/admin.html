@@ -21,17 +21,17 @@
 
 <hr/>
 
+<h3>Select Election</h3>
+<select id="electionSelect"></select>
+<button onclick="loadElections()">Refresh Elections</button>
+
+<hr/>
+
 <h3>Whitelist Voter ID(s)</h3>
 <textarea id="voterIdInput" rows="6" cols="50"
 placeholder="Enter Voter IDs (comma or newline separated)"></textarea>
 <br><br>
 <button onclick="whitelistVoterIds()">Whitelist</button>
-
-<hr/>
-
-<h3>Select Election</h3>
-<select id="electionSelect"></select>
-<button onclick="loadElections()">Refresh Elections</button>
 
 <hr/>
 
@@ -53,7 +53,7 @@ let provider;
 let signer;
 let contract;
 
-const contractAddress = "0xe220f65A8BEc57e742087067d49bFc5C089060A2";
+const contractAddress = "0xe2eFfe9AE20527e521356D7380cB70f841d6DC14";
 
 const abi = [
   "function createElection(string,uint,uint)",
@@ -62,8 +62,8 @@ const abi = [
   "function addCandidate(uint,string)",
   "function getCandidateCount(uint) view returns(uint)",
   "function getCandidate(uint,uint) view returns(string,uint)",
-  "function whitelistVoterId(bytes32)",
-  "function whitelistMultipleVoterIds(bytes32[])"
+  "function whitelistVoterId(uint,bytes32)",
+  "function whitelistMultipleVoterIds(uint,bytes32[])"
 ];
 
 async function connectWallet(){
@@ -91,6 +91,7 @@ async function createElection(){
 
 async function whitelistVoterIds(){
   let input = document.getElementById("voterIdInput").value;
+  let electionId = document.getElementById("electionSelect").value;
 
   if(input.trim() === "") return alert("Enter Voter ID(s)");
 
@@ -107,33 +108,25 @@ async function whitelistVoterIds(){
     }
   }
 
-  if(hashedArray.length === 0){
-    return alert("No valid IDs found");
-  }
-
   try{
 
-    // SINGLE
     if(hashedArray.length === 1){
-      const tx = await contract.whitelistVoterId(hashedArray[0]);
+      const tx = await contract.whitelistVoterId(electionId, hashedArray[0]);
       await tx.wait();
-      output("Single Voter ID whitelisted");
+      output("Voter ID whitelisted");
       return;
     }
 
-    // MULTIPLE (BATCH)
     const batchSize = 100;
 
     for(let i=0; i<hashedArray.length; i+=batchSize){
       const batch = hashedArray.slice(i, i+batchSize);
 
-      const tx = await contract.whitelistMultipleVoterIds(batch);
+      const tx = await contract.whitelistMultipleVoterIds(electionId, batch);
       await tx.wait();
-
-      output(`Batch ${i/batchSize + 1} uploaded`);
     }
 
-    output("All Voter IDs whitelisted successfully");
+    output("All Voter IDs whitelisted");
 
   }catch(err){
     console.error(err);

@@ -13,15 +13,15 @@
 
 <hr/>
 
-<h3>Register with Voter ID</h3>
-<input id="voterIdInput" placeholder="Enter your Voter ID"/>
-<button onclick="register()">Register</button>
-
-<hr/>
-
 <h3>Select Election</h3>
 <select id="electionSelect"></select>
 <button onclick="loadElections()">Refresh Elections</button>
+
+<hr/>
+
+<h3>Register with Voter ID</h3>
+<input id="voterIdInput" placeholder="Enter your Voter ID"/>
+<button onclick="register()">Register</button>
 
 <hr/>
 
@@ -37,7 +37,7 @@ let provider;
 let signer;
 let contract;
 
-const contractAddress = "0xe220f65A8BEc57e742087067d49bFc5C089060A2";
+const contractAddress = "0xe2eFfe9AE20527e521356D7380cB70f841d6DC14";
 
 const abi = [
   "function getElectionCount() view returns(uint)",
@@ -45,7 +45,9 @@ const abi = [
   "function getCandidateCount(uint) view returns(uint)",
   "function getCandidate(uint,uint) view returns(string,uint)",
   "function vote(uint,uint)",
-  "function register(bytes32)"
+  "function register(uint,bytes32)",
+  "function isWhitelisted(uint,bytes32) view returns(bool)",
+  "function isRegistered(uint,address) view returns(bool)"
 ];
 
 async function connectWallet(){
@@ -58,62 +60,102 @@ async function connectWallet(){
 
 async function register(){
   try{
-    const id=document.getElementById("voterIdInput").value.trim();
+    const id = document.getElementById("voterIdInput").value.trim();
+    const electionId = document.getElementById("electionSelect").value;
 
     if(id === "") return alert("Enter Voter ID");
 
-    const hashed=ethers.keccak256(ethers.toUtf8Bytes(id));
+    const hashed = ethers.keccak256(ethers.toUtf8Bytes(id));
 
-    const tx=await contract.register(hashed);
+    // 🔥 PRE-CHECK 1: WHITELIST
+    const isValid = await contract.isWhitelisted(electionId, hashed);
+    if(!isValid){
+      return output("❌ This Voter ID is not whitelisted for this election");
+    }
+
+    // 🔥 PRE-CHECK 2: ALREADY REGISTERED
+    const user = await signer.getAddress();
+    const already = await contract.isRegistered(electionId, user);
+
+    if(already){
+      return output("⚠️ You are already registered for this election");
+    }
+
+    const tx = await contract.register(electionId, hashed);
     await tx.wait();
 
-    output("Registered successfully");
+    output("✅ Registered successfully");
+
   }catch(err){
     console.error(err);
-    output("Error: " + (err.reason || "Transaction failed"));
+    output("❌ Registration failed");
   }
 }
 
 async function loadElections(){
-  const count=await contract.getElectionCount();
-  const select=document.getElementById("electionSelect");
+  const count = await contract.getElectionCount();
+  const select = document.getElementById("electionSelect");
   select.innerHTML="";
+
   for(let i=0;i<count;i++){
-    const e=await contract.getElection(i);
-    const opt=document.createElement("option");
-    opt.value=i;
-    opt.text=e[0];
+    const e = await contract.getElection(i);
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.text = e[0];
     select.appendChild(opt);
   }
 }
 
 async function loadCandidates(){
-  const id=document.getElementById("electionSelect").value;
-  const list=document.getElementById("candidateList");
+  const id = document.getElementById("electionSelect").value;
+  const list = document.getElementById("candidateList");
   list.innerHTML="";
-  const count=await contract.getCandidateCount(id);
+
+  const count = await contract.getCandidateCount(id);
+
   for(let i=0;i<count;i++){
-    const c=await contract.getCandidate(id,i);
-    const li=document.createElement("li");
-    li.innerHTML=`${c[0]} | Votes: ${c[1]} 
+    const c = await contract.getCandidate(id,i);
+
+    const li = document.createElement("li");
+    li.innerHTML = `${c[0]} | Votes: ${c[1]} 
       <button onclick="vote(${id},${i})">Vote</button>`;
+
     list.appendChild(li);
   }
 }
 
-async function vote(electionId,candidateId){
+async function vote(electionId, candidateId){
   try{
-    const tx=await contract.vote(electionId,candidateId);
+
+    // 🔥 CHECK ELECTION ACTIVE
+    const e = await contract.getElection(electionId);
+    const now = Math.floor(Date.now()/1000);
+
+    if(now < Number(e[1]) || now > Number(e[2])){
+      return output("⏳ Election is not active");
+    }
+
+    // 🔥 CHECK REGISTERED
+    const user = await signer.getAddress();
+    const isReg = await contract.isRegistered(electionId, user);
+
+    if(!isReg){
+      return output("❌ You are not registered for this election");
+    }
+
+    const tx = await contract.vote(electionId, candidateId);
     await tx.wait();
-    output("Vote successful");
+
+    output("✅ Vote successful");
+
   }catch(err){
     console.error(err);
-    output("Error: " + (err.reason || "Voting failed"));
+    output("❌ Voting failed");
   }
 }
 
 function output(msg){
-  document.getElementById("output").innerText=msg;
+  document.getElementById("output").innerText = msg;
 }
 </script>
 

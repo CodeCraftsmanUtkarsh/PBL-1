@@ -31,11 +31,11 @@ contract Voting {
     uint public electionCount;
     mapping(uint => Election) private elections;
 
-    // ===== VOTER ID SYSTEM =====
+    // ===== PER ELECTION VOTER SYSTEM =====
 
-    mapping(bytes32 => bool) public validVoterId;
-    mapping(address => bytes32) public registeredVoterId;
-    mapping(bytes32 => bool) public voterIdUsed;
+    mapping(uint => mapping(bytes32 => bool)) public validVoterId;
+    mapping(uint => mapping(address => bytes32)) public registeredVoterId;
+    mapping(uint => mapping(bytes32 => bool)) public voterIdUsed;
 
     // ===== ADMIN FUNCTIONS =====
 
@@ -67,24 +67,30 @@ contract Voting {
         e.candidateCount++;
     }
 
-    function whitelistVoterId(bytes32 _hashedId) public onlyAdmin {
-        validVoterId[_hashedId] = true;
+    function whitelistVoterId(uint _electionId, bytes32 _hashedId) public onlyAdmin {
+        require(_electionId < electionCount, "Election not found");
+        validVoterId[_electionId][_hashedId] = true;
     }
-    function whitelistMultipleVoterIds(bytes32[] memory _hashedIds) public onlyAdmin {
-    for(uint i = 0; i < _hashedIds.length; i++){
-        validVoterId[_hashedIds[i]] = true;
+
+    function whitelistMultipleVoterIds(uint _electionId, bytes32[] memory _hashedIds) public onlyAdmin {
+        require(_electionId < electionCount, "Election not found");
+
+        for(uint i = 0; i < _hashedIds.length; i++){
+            validVoterId[_electionId][_hashedIds[i]] = true;
+        }
     }
-}
+
     // ===== USER FUNCTIONS =====
 
-    function register(bytes32 _hashedId) public {
+    function register(uint _electionId, bytes32 _hashedId) public {
 
-        require(validVoterId[_hashedId], "Voter ID not valid");
-        require(registeredVoterId[msg.sender] == 0, "Wallet already registered");
-        require(!voterIdUsed[_hashedId], "Voter ID already used");
+        require(_electionId < electionCount, "Election not found");
+        require(validVoterId[_electionId][_hashedId], "Not whitelisted for this election");
+        require(registeredVoterId[_electionId][msg.sender] == 0, "Already registered");
+        require(!voterIdUsed[_electionId][_hashedId], "Voter ID already used");
 
-        registeredVoterId[msg.sender] = _hashedId;
-        voterIdUsed[_hashedId] = true;
+        registeredVoterId[_electionId][msg.sender] = _hashedId;
+        voterIdUsed[_electionId][_hashedId] = true;
     }
 
     function vote(
@@ -102,7 +108,7 @@ contract Voting {
             "Election not active"
         );
 
-        bytes32 voterId = registeredVoterId[msg.sender];
+        bytes32 voterId = registeredVoterId[_electionId][msg.sender];
 
         require(voterId != 0, "Not registered");
         require(!e.hasVoted[voterId], "Already voted");
@@ -142,5 +148,15 @@ contract Voting {
     {
         Candidate storage c = elections[_electionId].candidates[_candidateId];
         return (c.name, c.voteCount);
+    }
+
+    // ===== HELPER FUNCTIONS =====
+
+    function isWhitelisted(uint _electionId, bytes32 _hashedId) public view returns(bool){
+        return validVoterId[_electionId][_hashedId];
+    }
+
+    function isRegistered(uint _electionId, address user) public view returns(bool){
+        return registeredVoterId[_electionId][user] != 0;
     }
 }
