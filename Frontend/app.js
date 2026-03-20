@@ -2,7 +2,7 @@ let provider;
 let signer;
 let contract;
 
-const contractAddress = "0x1e8C45a08Ffb0398228A1725253f6DD7d13a2F5A";
+const contractAddress = "0x2f02Ad5F8a426Fe7C27C4551aAE4895D1B9475a4";
 
 const abi = [
   "function createElection(string,uint,uint)",

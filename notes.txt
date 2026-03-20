@@ -3,7 +3,7 @@ start ganache
 then npx hardhat compile (converts solidity to bytecode)
 (The contract is simply waiting locally until deployment sends it to blockchain.)
 then deploy that contract on the ganache network by: npx hardhat run scripts/deploy.js --network ganache
-Copy contract address → index.html
+Copy contract address → admin.html and voter.html and app.js
 Because frontend needs contract location.
 then npx serve
 then for 2nd time:
