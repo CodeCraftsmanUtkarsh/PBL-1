@@ -21,19 +21,11 @@
 
 <hr/>
 
-<!-- SINGLE PRN -->
-<h3>Whitelist Single PRN</h3>
-<input id="prnInput" placeholder="Enter PRN"/>
-<button onclick="whitelistPRN()">Whitelist</button>
-
-<hr/>
-
-<!-- BULK PRN -->
-<h3>Bulk Whitelist PRNs</h3>
-<textarea id="bulkPRN" rows="6" cols="50"
-placeholder="Enter PRNs separated by commas (e.g. 12345,12346,12347)"></textarea>
+<h3>Whitelist Voter ID(s)</h3>
+<textarea id="voterIdInput" rows="6" cols="50"
+placeholder="Enter Voter IDs (comma or newline separated)"></textarea>
 <br><br>
-<button onclick="whitelistBulk()">Upload Bulk PRNs</button>
+<button onclick="whitelistVoterIds()">Whitelist</button>
 
 <hr/>
 
@@ -61,7 +53,7 @@ let provider;
 let signer;
 let contract;
 
-const contractAddress = "0x2f02Ad5F8a426Fe7C27C4551aAE4895D1B9475a4";
+const contractAddress = "0xe220f65A8BEc57e742087067d49bFc5C089060A2";
 
 const abi = [
   "function createElection(string,uint,uint)",
@@ -70,8 +62,8 @@ const abi = [
   "function addCandidate(uint,string)",
   "function getCandidateCount(uint) view returns(uint)",
   "function getCandidate(uint,uint) view returns(string,uint)",
-  "function whitelistPRN(bytes32)",
-  "function whitelistMultiplePRNs(bytes32[])"
+  "function whitelistVoterId(bytes32)",
+  "function whitelistMultipleVoterIds(bytes32[])"
 ];
 
 async function connectWallet(){
@@ -97,38 +89,56 @@ async function createElection(){
   loadElections();
 }
 
-async function whitelistPRN(){
-  const prn=document.getElementById("prnInput").value;
-  if(prn==="") return alert("Enter PRN");
+async function whitelistVoterIds(){
+  let input = document.getElementById("voterIdInput").value;
 
-  const hashed=ethers.keccak256(ethers.toUtf8Bytes(prn));
-  const tx=await contract.whitelistPRN(hashed);
-  await tx.wait();
-  output("Single PRN whitelisted");
-}
+  if(input.trim() === "") return alert("Enter Voter ID(s)");
 
-async function whitelistBulk(){
+  let ids = input.split(/[\n,]+/);
+  let hashedArray = [];
 
-  const input = document.getElementById("bulkPRN").value;
-  if(input==="") return alert("Enter PRNs");
-
-  const prnArray = input.split(",");
-  const hashedArray = [];
-
-  for(let i=0;i<prnArray.length;i++){
-    const clean = prnArray[i].trim();
-    if(clean!==""){
-      const hashed = ethers.keccak256(
+  for(let i=0;i<ids.length;i++){
+    let clean = ids[i].trim();
+    if(clean !== ""){
+      let hashed = ethers.keccak256(
         ethers.toUtf8Bytes(clean)
       );
       hashedArray.push(hashed);
     }
   }
 
-  const tx = await contract.whitelistMultiplePRNs(hashedArray);
-  await tx.wait();
+  if(hashedArray.length === 0){
+    return alert("No valid IDs found");
+  }
 
-  output("Bulk PRNs whitelisted successfully");
+  try{
+
+    // SINGLE
+    if(hashedArray.length === 1){
+      const tx = await contract.whitelistVoterId(hashedArray[0]);
+      await tx.wait();
+      output("Single Voter ID whitelisted");
+      return;
+    }
+
+    // MULTIPLE (BATCH)
+    const batchSize = 100;
+
+    for(let i=0; i<hashedArray.length; i+=batchSize){
+      const batch = hashedArray.slice(i, i+batchSize);
+
+      const tx = await contract.whitelistMultipleVoterIds(batch);
+      await tx.wait();
+
+      output(`Batch ${i/batchSize + 1} uploaded`);
+    }
+
+    output("All Voter IDs whitelisted successfully");
+
+  }catch(err){
+    console.error(err);
+    output("Error: " + (err.reason || "Transaction failed"));
+  }
 }
 
 async function loadElections(){
@@ -169,5 +179,6 @@ function output(msg){
   document.getElementById("output").innerText=msg;
 }
 </script>
+
 </body>
 </html>

@@ -13,8 +13,8 @@
 
 <hr/>
 
-<h3>Register with PRN</h3>
-<input id="prnInput" placeholder="Enter your PRN"/>
+<h3>Register with Voter ID</h3>
+<input id="voterIdInput" placeholder="Enter your Voter ID"/>
 <button onclick="register()">Register</button>
 
 <hr/>
@@ -37,7 +37,7 @@ let provider;
 let signer;
 let contract;
 
-const contractAddress = "0x2f02Ad5F8a426Fe7C27C4551aAE4895D1B9475a4";
+const contractAddress = "0xe220f65A8BEc57e742087067d49bFc5C089060A2";
 
 const abi = [
   "function getElectionCount() view returns(uint)",
@@ -57,11 +57,21 @@ async function connectWallet(){
 }
 
 async function register(){
-  const prn=document.getElementById("prnInput").value;
-  const hashed=ethers.keccak256(ethers.toUtf8Bytes(prn));
-  const tx=await contract.register(hashed);
-  await tx.wait();
-  output("Registered successfully");
+  try{
+    const id=document.getElementById("voterIdInput").value.trim();
+
+    if(id === "") return alert("Enter Voter ID");
+
+    const hashed=ethers.keccak256(ethers.toUtf8Bytes(id));
+
+    const tx=await contract.register(hashed);
+    await tx.wait();
+
+    output("Registered successfully");
+  }catch(err){
+    console.error(err);
+    output("Error: " + (err.reason || "Transaction failed"));
+  }
 }
 
 async function loadElections(){
@@ -92,14 +102,20 @@ async function loadCandidates(){
 }
 
 async function vote(electionId,candidateId){
-  const tx=await contract.vote(electionId,candidateId);
-  await tx.wait();
-  output("Vote successful");
+  try{
+    const tx=await contract.vote(electionId,candidateId);
+    await tx.wait();
+    output("Vote successful");
+  }catch(err){
+    console.error(err);
+    output("Error: " + (err.reason || "Voting failed"));
+  }
 }
 
 function output(msg){
   document.getElementById("output").innerText=msg;
 }
 </script>
+
 </body>
 </html>
