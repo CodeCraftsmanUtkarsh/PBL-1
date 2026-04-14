@@ -1,15 +1,27 @@
 {
   "name": "blockchain",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Blockchain Voting System with Supabase OTP",
+  "main": "backend/server.js",
   "scripts": {
+    "start": "node backend/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "blockchain",
+    "voting",
+    "supabase",
+    "otp"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.103.0",
+    "body-parser": "^1.20.4",
+    "cors": "^2.8.6",
+    "express": "^4.22.1"
+  },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.3",
     "ethers": "^5.8.0",

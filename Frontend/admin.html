@@ -53,7 +53,7 @@ let provider;
 let signer;
 let contract;
 
-const contractAddress = "0xe2eFfe9AE20527e521356D7380cB70f841d6DC14";
+const contractAddress = "0xBF92840DB7078b5864e92E2187fAE47574548bC9";
 
 const abi = [
   "function createElection(string,uint,uint)",
@@ -66,40 +66,177 @@ const abi = [
   "function whitelistMultipleVoterIds(uint,bytes32[])"
 ];
 
+// ======================
+// WALLET CONNECT
+// ======================
 async function connectWallet(){
-  await window.ethereum.request({ method:"eth_requestAccounts" });
-  provider = new ethers.BrowserProvider(window.ethereum);
-  signer = await provider.getSigner();
-  contract = new ethers.Contract(contractAddress, abi, signer);
-  output("Admin wallet connected");
+  try{
+    await window.ethereum.request({ method:"eth_requestAccounts" });
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    contract = new ethers.Contract(contractAddress, abi, signer);
+    output("✅ Wallet connected");
+  }catch(err){
+    console.error(err);
+    output("❌ Wallet connection failed");
+  }
 }
 
+// ======================
+// SAFETY CHECK
+// ======================
+function requireWallet(){
+  if(!contract){
+    alert("Connect wallet first");
+    return false;
+  }
+  return true;
+}
+
+// ======================
+// TIME FIX (UTC)
+// ======================
 function toTimestamp(value){
-  return Math.floor(new Date(value).getTime()/1000);
+  return Math.floor(new Date(value + "Z").getTime()/1000);
 }
 
+// ======================
+// CREATE ELECTION
+// ======================
 async function createElection(){
-  const name=document.getElementById("eName").value;
-  const start=toTimestamp(document.getElementById("start").value);
-  const end=toTimestamp(document.getElementById("end").value);
 
-  const tx=await contract.createElection(name,start,end);
-  await tx.wait();
-  output("Election created");
-  loadElections();
+  if(!requireWallet()) return;
+
+  const name = document.getElementById("eName").value.trim();
+  const startVal = document.getElementById("start").value;
+  const endVal = document.getElementById("end").value;
+
+  if(!name) return alert("Enter election name");
+  if(!startVal || !endVal) return alert("Select start & end time");
+
+  const start = toTimestamp(startVal);
+  const end = toTimestamp(endVal);
+
+  try{
+    const tx = await contract.createElection(name, start, end);
+    await tx.wait();
+
+    output("✅ Election created");
+    loadElections();
+
+  }catch(err){
+    console.error(err);
+    output("❌ Error: " + (err.reason || "Transaction failed"));
+  }
 }
 
+// ======================
+// LOAD ELECTIONS
+// ======================
+async function loadElections(){
+
+  if(!requireWallet()) return;
+
+  try{
+    const count = await contract.getElectionCount();
+    const select = document.getElementById("electionSelect");
+
+    select.innerHTML = "";
+
+    for(let i=0;i<count;i++){
+      const e = await contract.getElection(i);
+
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.text = `${i} - ${e[0]}`;
+      select.appendChild(opt);
+    }
+
+    output("✅ Elections loaded");
+
+  }catch(err){
+    console.error(err);
+    output("❌ Failed to load elections");
+  }
+}
+
+// ======================
+// ADD CANDIDATE
+// ======================
+async function addCandidate(){
+
+  if(!requireWallet()) return;
+
+  const electionId = document.getElementById("electionSelect").value;
+  const name = document.getElementById("candidate").value.trim();
+
+  if(electionId === "") return alert("Select election");
+  if(!name) return alert("Enter candidate name");
+
+  try{
+    const tx = await contract.addCandidate(electionId, name);
+    await tx.wait();
+
+    output("✅ Candidate added");
+
+  }catch(err){
+    console.error(err);
+    output("❌ Error: " + (err.reason || "Transaction failed"));
+  }
+}
+
+// ======================
+// LOAD CANDIDATES
+// ======================
+async function loadCandidates(){
+
+  if(!requireWallet()) return;
+
+  const electionId = document.getElementById("electionSelect").value;
+
+  if(electionId === "") return alert("Select election");
+
+  try{
+    const list = document.getElementById("candidateList");
+    list.innerHTML = "";
+
+    const count = await contract.getCandidateCount(electionId);
+
+    for(let i=0;i<count;i++){
+      const c = await contract.getCandidate(electionId, i);
+
+      const li = document.createElement("li");
+      li.innerText = `${c[0]} | Votes: ${c[1]}`;
+      list.appendChild(li);
+    }
+
+    output("✅ Candidates loaded");
+
+  }catch(err){
+    console.error(err);
+    output("❌ Failed to load candidates");
+  }
+}
+
+// ======================
+// WHITELIST IDS
+// ======================
 async function whitelistVoterIds(){
+
+  if(!requireWallet()) return;
+
   let input = document.getElementById("voterIdInput").value;
   let electionId = document.getElementById("electionSelect").value;
 
-  if(input.trim() === "") return alert("Enter Voter ID(s)");
+  if(electionId === "") return alert("Select election");
+  if(input.trim() === "") return alert("Enter Voter IDs");
 
   let ids = input.split(/[\n,]+/);
   let hashedArray = [];
 
   for(let i=0;i<ids.length;i++){
     let clean = ids[i].trim();
+
     if(clean !== ""){
       let hashed = ethers.keccak256(
         ethers.toUtf8Bytes(clean)
@@ -110,67 +247,40 @@ async function whitelistVoterIds(){
 
   try{
 
-    if(hashedArray.length === 1){
-      const tx = await contract.whitelistVoterId(electionId, hashedArray[0]);
-      await tx.wait();
-      output("Voter ID whitelisted");
-      return;
-    }
-
-    const batchSize = 100;
+    const batchSize = 25;
 
     for(let i=0; i<hashedArray.length; i+=batchSize){
+
+      output(`⏳ Processing batch ${Math.floor(i/batchSize)+1}`);
+
       const batch = hashedArray.slice(i, i+batchSize);
 
       const tx = await contract.whitelistMultipleVoterIds(electionId, batch);
       await tx.wait();
     }
 
-    output("All Voter IDs whitelisted");
+    output("✅ All voter IDs whitelisted");
 
   }catch(err){
     console.error(err);
-    output("Error: " + (err.reason || "Transaction failed"));
+    output("❌ Error: " + (err.reason || "Transaction failed"));
   }
 }
 
-async function loadElections(){
-  const count = await contract.getElectionCount();
-  const select = document.getElementById("electionSelect");
-  select.innerHTML="";
-  for(let i=0;i<count;i++){
-    const e=await contract.getElection(i);
-    const opt=document.createElement("option");
-    opt.value=i;
-    opt.text=e[0];
-    select.appendChild(opt);
-  }
-}
-
-async function addCandidate(){
-  const id=document.getElementById("electionSelect").value;
-  const name=document.getElementById("candidate").value;
-  const tx=await contract.addCandidate(id,name);
-  await tx.wait();
-  output("Candidate added");
-}
-
-async function loadCandidates(){
-  const id=document.getElementById("electionSelect").value;
-  const list=document.getElementById("candidateList");
-  list.innerHTML="";
-  const count=await contract.getCandidateCount(id);
-  for(let i=0;i<count;i++){
-    const c=await contract.getCandidate(id,i);
-    const li=document.createElement("li");
-    li.innerText=`${c[0]} | Votes: ${c[1]}`;
-    list.appendChild(li);
-  }
-}
-
+// ======================
+// OUTPUT
+// ======================
 function output(msg){
-  document.getElementById("output").innerText=msg;
+  document.getElementById("output").innerText = msg;
 }
+
+// ======================
+// AUTO LOAD
+// ======================
+window.onload = () => {
+  output("⚡ Connect wallet to start");
+};
+
 </script>
 
 </body>
