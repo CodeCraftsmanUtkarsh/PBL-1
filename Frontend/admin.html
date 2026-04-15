@@ -15,23 +15,15 @@
 
 <h3>Create Election</h3>
 <input id="eName" placeholder="Election name"/>
-<input id="start" type="datetime-local"/>
-<input id="end" type="datetime-local"/>
+<input type="datetime-local" id="start"/>
+<input type="datetime-local" id="end"/>
 <button onclick="createElection()">Create Election</button>
 
 <hr/>
 
 <h3>Select Election</h3>
 <select id="electionSelect"></select>
-<button onclick="loadElections()">Refresh Elections</button>
-
-<hr/>
-
-<h3>Whitelist Voter ID(s)</h3>
-<textarea id="voterIdInput" rows="6" cols="50"
-placeholder="Enter Voter IDs (comma or newline separated)"></textarea>
-<br><br>
-<button onclick="whitelistVoterIds()">Whitelist</button>
+<button onclick="loadElections()">Load Elections</button>
 
 <hr/>
 
@@ -41,7 +33,15 @@ placeholder="Enter Voter IDs (comma or newline separated)"></textarea>
 
 <hr/>
 
-<h3>Candidates</h3>
+<h3>Whitelist Voter IDs</h3>
+<textarea id="voterIdInput" rows="5" cols="40"
+placeholder="Enter Aadhaar IDs (comma or newline separated)"></textarea>
+<br/>
+<button onclick="whitelistVoterIds()">Whitelist</button>
+
+<hr/>
+
+<h3>Show Candidates</h3>
 <button onclick="loadCandidates()">Show Candidates</button>
 <ul id="candidateList"></ul>
 
@@ -49,11 +49,9 @@ placeholder="Enter Voter IDs (comma or newline separated)"></textarea>
 
 <script>
 
-let provider;
-let signer;
-let contract;
+let provider, signer, contract;
 
-const contractAddress = "0xBF92840DB7078b5864e92E2187fAE47574548bC9";
+const contractAddress = "0x3C8e9A24d627fAB70Be876E05B480332600B8DB7";
 
 const abi = [
   "function createElection(string,uint,uint)",
@@ -62,28 +60,27 @@ const abi = [
   "function addCandidate(uint,string)",
   "function getCandidateCount(uint) view returns(uint)",
   "function getCandidate(uint,uint) view returns(string,uint)",
-  "function whitelistVoterId(uint,bytes32)",
   "function whitelistMultipleVoterIds(uint,bytes32[])"
 ];
 
 // ======================
-// WALLET CONNECT
-// ======================
 async function connectWallet(){
   try{
     await window.ethereum.request({ method:"eth_requestAccounts" });
+
     provider = new ethers.BrowserProvider(window.ethereum);
     signer = await provider.getSigner();
+
     contract = new ethers.Contract(contractAddress, abi, signer);
+
     output("✅ Wallet connected");
+
   }catch(err){
     console.error(err);
     output("❌ Wallet connection failed");
   }
 }
 
-// ======================
-// SAFETY CHECK
 // ======================
 function requireWallet(){
   if(!contract){
@@ -94,14 +91,10 @@ function requireWallet(){
 }
 
 // ======================
-// TIME FIX (UTC)
-// ======================
-function toTimestamp(value){
-  return Math.floor(new Date(value + "Z").getTime()/1000);
+function toTimestamp(val){
+  return Math.floor(new Date(val).getTime()/1000);
 }
 
-// ======================
-// CREATE ELECTION
 // ======================
 async function createElection(){
 
@@ -111,27 +104,29 @@ async function createElection(){
   const startVal = document.getElementById("start").value;
   const endVal = document.getElementById("end").value;
 
-  if(!name) return alert("Enter election name");
-  if(!startVal || !endVal) return alert("Select start & end time");
+  if(!name) return output("❌ Enter election name");
+  if(!startVal || !endVal) return output("❌ Select time");
 
   const start = toTimestamp(startVal);
   const end = toTimestamp(endVal);
+
+  if(start >= end){
+    return output("❌ End must be after start");
+  }
 
   try{
     const tx = await contract.createElection(name, start, end);
     await tx.wait();
 
     output("✅ Election created");
-    loadElections();
+    await loadElections();
 
   }catch(err){
     console.error(err);
-    output("❌ Error: " + (err.reason || "Transaction failed"));
+    output("❌ " + (err.reason || err.message));
   }
 }
 
-// ======================
-// LOAD ELECTIONS
 // ======================
 async function loadElections(){
 
@@ -139,8 +134,8 @@ async function loadElections(){
 
   try{
     const count = await contract.getElectionCount();
-    const select = document.getElementById("electionSelect");
 
+    const select = document.getElementById("electionSelect");
     select.innerHTML = "";
 
     for(let i=0;i<count;i++){
@@ -161,49 +156,48 @@ async function loadElections(){
 }
 
 // ======================
-// ADD CANDIDATE
-// ======================
 async function addCandidate(){
 
   if(!requireWallet()) return;
 
-  const electionId = document.getElementById("electionSelect").value;
+  const id = document.getElementById("electionSelect").value;
   const name = document.getElementById("candidate").value.trim();
 
-  if(electionId === "") return alert("Select election");
-  if(!name) return alert("Enter candidate name");
+  if(id === "") return output("❌ Select election");
+  if(!name) return output("❌ Enter candidate");
 
   try{
-    const tx = await contract.addCandidate(electionId, name);
+    const tx = await contract.addCandidate(id, name);
     await tx.wait();
 
     output("✅ Candidate added");
 
+    // 🔥 AUTO REFRESH
+    await loadCandidates();
+
   }catch(err){
     console.error(err);
-    output("❌ Error: " + (err.reason || "Transaction failed"));
+    output("❌ " + (err.reason || err.message));
   }
 }
 
-// ======================
-// LOAD CANDIDATES
 // ======================
 async function loadCandidates(){
 
   if(!requireWallet()) return;
 
-  const electionId = document.getElementById("electionSelect").value;
+  const id = document.getElementById("electionSelect").value;
 
-  if(electionId === "") return alert("Select election");
+  if(id === "") return output("❌ Select election");
 
   try{
     const list = document.getElementById("candidateList");
     list.innerHTML = "";
 
-    const count = await contract.getCandidateCount(electionId);
+    const count = await contract.getCandidateCount(id);
 
     for(let i=0;i<count;i++){
-      const c = await contract.getCandidate(electionId, i);
+      const c = await contract.getCandidate(id, i);
 
       const li = document.createElement("li");
       li.innerText = `${c[0]} | Votes: ${c[1]}`;
@@ -219,63 +213,44 @@ async function loadCandidates(){
 }
 
 // ======================
-// WHITELIST IDS
-// ======================
 async function whitelistVoterIds(){
 
   if(!requireWallet()) return;
 
-  let input = document.getElementById("voterIdInput").value;
-  let electionId = document.getElementById("electionSelect").value;
+  const input = document.getElementById("voterIdInput").value;
+  const id = document.getElementById("electionSelect").value;
 
-  if(electionId === "") return alert("Select election");
-  if(input.trim() === "") return alert("Enter Voter IDs");
+  if(id === "") return output("❌ Select election");
 
-  let ids = input.split(/[\n,]+/);
-  let hashedArray = [];
+  let arr = input.split(/[\n,]+/);
+  let hashed = [];
 
-  for(let i=0;i<ids.length;i++){
-    let clean = ids[i].trim();
-
-    if(clean !== ""){
-      let hashed = ethers.keccak256(
-        ethers.toUtf8Bytes(clean)
+  for(let x of arr){
+    let clean = x.trim();
+    if(clean){
+      hashed.push(
+        ethers.keccak256(ethers.toUtf8Bytes(clean))
       );
-      hashedArray.push(hashed);
     }
   }
 
   try{
+    const tx = await contract.whitelistMultipleVoterIds(id, hashed);
+    await tx.wait();
 
-    const batchSize = 25;
-
-    for(let i=0; i<hashedArray.length; i+=batchSize){
-
-      output(`⏳ Processing batch ${Math.floor(i/batchSize)+1}`);
-
-      const batch = hashedArray.slice(i, i+batchSize);
-
-      const tx = await contract.whitelistMultipleVoterIds(electionId, batch);
-      await tx.wait();
-    }
-
-    output("✅ All voter IDs whitelisted");
+    output("✅ Whitelisted");
 
   }catch(err){
     console.error(err);
-    output("❌ Error: " + (err.reason || "Transaction failed"));
+    output("❌ " + (err.reason || err.message));
   }
 }
 
-// ======================
-// OUTPUT
 // ======================
 function output(msg){
   document.getElementById("output").innerText = msg;
 }
 
-// ======================
-// AUTO LOAD
 // ======================
 window.onload = () => {
   output("⚡ Connect wallet to start");

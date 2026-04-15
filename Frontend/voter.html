@@ -28,8 +28,9 @@
 
 <h3>Verify OTP</h3>
 <input id="otpInput" placeholder="Enter OTP"/>
-<button onclick="verifyAndRegister()">Verify & Register</button>
+<button onclick="verifyAndLogin()">Verify & Login</button>
 
+<!-- ✅ TIMER -->
 <p id="timer" style="color:red;"></p>
 
 <hr/>
@@ -45,11 +46,12 @@
 const BASE_URL = "http://localhost:3000";
 
 let provider, signer, contract;
-let storedEmail = "";
-let otpTimerInterval = null;
-let timeLeft = 30;
 
-const contractAddress = "0xBF92840DB7078b5864e92E2187fAE47574548bC9";
+let storedEmail = "";
+let otpTimer = null;
+let timeLeft = 0;
+
+const contractAddress = "0x3C8e9A24d627fAB70Be876E05B480332600B8DB7";
 
 const abi = [
   "function getElectionCount() view returns(uint)",
@@ -58,147 +60,265 @@ const abi = [
   "function getCandidate(uint,uint) view returns(string,uint)",
   "function vote(uint,uint)",
   "function register(uint,bytes32)",
-  "function isRegistered(uint,address) view returns(bool)"
+  "function isRegistered(uint,address) view returns(bool)",
+  "function hasAlreadyVoted(uint,address) view returns(bool)"
 ];
 
 // ======================
 async function connectWallet(){
-  await window.ethereum.request({ method:"eth_requestAccounts" });
-  provider = new ethers.BrowserProvider(window.ethereum);
-  signer = await provider.getSigner();
-  contract = new ethers.Contract(contractAddress, abi, signer);
-  output("✅ Wallet connected");
+
+  if(!window.ethereum){
+    return alert("Install MetaMask");
+  }
+
+  try{
+    await window.ethereum.request({ method:"eth_requestAccounts" });
+
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+
+    contract = new ethers.Contract(contractAddress, abi, signer);
+
+    output("✅ Wallet connected");
+
+  }catch(err){
+    console.error(err);
+    output("❌ Wallet connection failed");
+  }
 }
 
 // ======================
-function startTimer(){
-  clearInterval(otpTimerInterval);
-  timeLeft = 30;
-
-  otpTimerInterval = setInterval(() => {
-    document.getElementById("timer").innerText =
-      `⏳ OTP expires in ${timeLeft}s`;
-
-    timeLeft--;
-
-    if(timeLeft < 0){
-      clearInterval(otpTimerInterval);
-      document.getElementById("timer").innerText =
-        "❌ OTP expired. Request again.";
-    }
-  }, 1000);
-}
-
-// ======================
-async function sendOtp(){
-  const aadhaar = document.getElementById("voterIdInput").value.trim();
-
-  const res = await fetch(`${BASE_URL}/send-otp`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ aadhaar })
-  });
-
-  const data = await res.json();
-
-  if(!data.success){
-    return output("❌ " + data.message);
+function requireWallet(){
+  if(!contract){
+    alert("Connect wallet first");
+    return false;
   }
-
-  storedEmail = data.email;
-
-  output("📩 OTP sent");
-  startTimer(); // 🔥 START COUNTDOWN
-}
-
-// ======================
-async function verifyAndRegister(){
-  const aadhaar = document.getElementById("voterIdInput").value.trim();
-  const otp = document.getElementById("otpInput").value.trim();
-  const electionId = document.getElementById("electionSelect").value;
-
-  if(timeLeft <= 0){
-    return output("❌ OTP expired");
-  }
-
-  const wallet = await signer.getAddress();
-
-  const res = await fetch(`${BASE_URL}/verify-otp`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      email: storedEmail,
-      token: otp,
-      aadhaar,
-      wallet
-    })
-  });
-
-  const data = await res.json();
-
-  if(!data.success){
-    return output("❌ " + data.message);
-  }
-
-  const hashed = ethers.keccak256(ethers.toUtf8Bytes(aadhaar));
-
-  const already = await contract.isRegistered(electionId, wallet);
-
-  if(already){
-    return output("⚠️ Already registered, you can vote");
-  }
-
-  const tx = await contract.register(electionId, hashed);
-  await tx.wait();
-
-  output("✅ Registered");
+  return true;
 }
 
 // ======================
 async function loadElections(){
-  if(!contract) await connectWallet();
 
-  const count = await contract.getElectionCount();
-  const select = document.getElementById("electionSelect");
-  select.innerHTML = "";
+  if(!requireWallet()) return;
 
-  for(let i=0;i<count;i++){
-    const e = await contract.getElection(i);
-    const opt = document.createElement("option");
-    opt.value = i;
-    opt.text = `${i} - ${e[0]}`;
-    select.appendChild(opt);
+  try{
+    const count = await contract.getElectionCount();
+    const select = document.getElementById("electionSelect");
+
+    select.innerHTML = "";
+
+    const now = Math.floor(Date.now() / 1000);
+
+    for(let i=0;i<count;i++){
+      const e = await contract.getElection(i);
+
+      const start = Number(e[1]);
+      const end = Number(e[2]);
+
+      // 🔥 ONLY SHOW ACTIVE
+      if(now >= start && now <= end){
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.text = `${i} - ${e[0]}`;
+        select.appendChild(opt);
+      }
+    }
+
+    if(select.innerHTML === ""){
+      output("⚠️ No active elections");
+    } else {
+      output("✅ Active elections loaded");
+    }
+
+  }catch(err){
+    console.error(err);
+    output("❌ Failed to load elections");
+  }
+}
+
+// ======================
+async function sendOtp(){
+
+  const aadhaar = document.getElementById("voterIdInput").value.trim();
+  const electionId = document.getElementById("electionSelect").value;
+
+  if(aadhaar === "") return output("❌ Enter Aadhaar");
+  if(electionId === "") return output("❌ Select election");
+
+  try{
+    const res = await fetch(`${BASE_URL}/send-otp`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ aadhaar, electionId })
+    });
+
+    const data = await res.json();
+
+    if(!data.success){
+      return output("❌ " + data.message);
+    }
+
+    storedEmail = data.email;
+
+    output("📩 OTP sent");
+
+    // 🔥 START TIMER
+    startTimer(60);
+
+  }catch(err){
+    console.error(err);
+    output("❌ OTP failed");
+  }
+}
+
+// ======================
+function startTimer(seconds){
+
+  clearInterval(otpTimer);
+
+  timeLeft = seconds;
+
+  const timerEl = document.getElementById("timer");
+
+  otpTimer = setInterval(() => {
+
+    if(timeLeft <= 0){
+      clearInterval(otpTimer);
+      timerEl.innerText = "❌ OTP expired";
+      return;
+    }
+
+    timerEl.innerText = `⏳ OTP expires in ${timeLeft}s`;
+
+    timeLeft--;
+
+  }, 1000);
+}
+
+// ======================
+async function verifyAndLogin(){
+
+  if(!requireWallet()) return;
+
+  const aadhaar = document.getElementById("voterIdInput").value.trim().toLowerCase();
+  const otp = document.getElementById("otpInput").value.trim();
+
+  if(!otp) return output("❌ Enter OTP");
+
+  try{
+    const wallet = await signer.getAddress();
+
+    const res = await fetch(`${BASE_URL}/verify-otp`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        email: storedEmail,
+        token: otp,
+        aadhaar,
+        wallet
+      })
+    });
+
+    const data = await res.json();
+
+    if(!data.success){
+      return output("❌ " + data.message);
+    }
+
+    // 🔥 STOP TIMER
+    clearInterval(otpTimer);
+    document.getElementById("timer").innerText = "✅ OTP verified";
+
+    output("✅ Logged in");
+
+  }catch(err){
+    console.error(err);
+    output("❌ Verification failed");
   }
 }
 
 // ======================
 async function loadCandidates(){
+
+  if(!requireWallet()) return;
+
   const id = document.getElementById("electionSelect").value;
-  const list = document.getElementById("candidateList");
-  list.innerHTML = "";
 
-  const count = await contract.getCandidateCount(id);
+  if(id === "") return output("❌ Select election");
 
-  for(let i=0;i<count;i++){
-    const c = await contract.getCandidate(id,i);
+  try{
+    const list = document.getElementById("candidateList");
+    list.innerHTML = "";
 
-    const li = document.createElement("li");
-    li.innerHTML = `
-      ${c[0]} | Votes: ${c[1]} 
-      <button onclick="vote(${id},${i})">Vote</button>
-    `;
-    list.appendChild(li);
+    const wallet = await signer.getAddress();
+    const voted = await contract.hasAlreadyVoted(id, wallet);
+
+    const count = await contract.getCandidateCount(id);
+
+    for(let i=0;i<count;i++){
+      const c = await contract.getCandidate(id, i);
+
+      const li = document.createElement("li");
+
+      li.innerHTML = `
+        ${c[0]} | Votes: ${c[1]}
+        <button ${voted ? "disabled" : ""} onclick="vote(${id},${i})">
+          ${voted ? "Voted" : "Vote"}
+        </button>
+      `;
+
+      list.appendChild(li);
+    }
+
+    if(voted){
+      output("⚠️ You have already voted");
+    } else {
+      output("✅ Candidates loaded");
+    }
+
+  }catch(err){
+    console.error(err);
+    output("❌ Failed to load candidates");
   }
 }
 
 // ======================
 async function vote(electionId, candidateId){
+
   try{
+    const wallet = await signer.getAddress();
+
+    const aadhaar = document.getElementById("voterIdInput").value.trim().toLowerCase();
+
+    let isReg = await contract.isRegistered(electionId, wallet);
+
+    if(!isReg){
+      const hashed = ethers.keccak256(ethers.toUtf8Bytes(aadhaar));
+      const tx1 = await contract.register(electionId, hashed);
+      await tx1.wait();
+    }
+
+    const voted = await contract.hasAlreadyVoted(electionId, wallet);
+
+    if(voted){
+      return output("❌ Already voted");
+    }
+
     const tx = await contract.vote(electionId, candidateId);
     await tx.wait();
+
     output("✅ Vote successful");
+
+    await loadCandidates();
+
   }catch(err){
-    output("❌ " + (err.reason || "Voting failed"));
+    console.error(err);
+
+    if(err.reason){
+      return output("❌ " + err.reason);
+    }
+
+    output("❌ Transaction failed");
   }
 }
 

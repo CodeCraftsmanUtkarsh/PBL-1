@@ -12,3 +12,6 @@ Student authenticates via biometric (fingerprint on phone)
 Then signs wallet transaction
 Now sharing becomes nearly impossible.
 )
+
+const SUPABASE_URL = "https://sdrbzhrypzsruvekhnst.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkcmJ6aHJ5cHpzcnV2ZWtobnN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MzM0OTAsImV4cCI6MjA5MTEwOTQ5MH0.a3Kj_Pva5oswKIf1hwEucslkKeOUJnnDCYxKB-gDhWg";
