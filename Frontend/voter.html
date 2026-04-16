@@ -51,7 +51,7 @@ let storedEmail = "";
 let otpTimer = null;
 let timeLeft = 0;
 
-const contractAddress = "0x0483DA68456E644fdBE922813B47aC0B29a874C3";
+const contractAddress = "0x4CFcFc5edf595EFb354b1756747aE170f4614da5";
 
 const abi = [
   "function getElectionCount() view returns(uint)",
@@ -209,15 +209,16 @@ async function verifyAndLogin(){
     const wallet = await signer.getAddress();
 
     const res = await fetch(`${BASE_URL}/verify-otp`, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({
-        email: storedEmail,
-        token: otp,
-        aadhaar,
-        wallet
-      })
-    });
+  method:"POST",
+  headers:{ "Content-Type":"application/json" },
+  body: JSON.stringify({
+    email: storedEmail,
+    token: otp,
+    aadhaar,
+    wallet,
+    electionId: document.getElementById("electionSelect").value
+  })
+});
 
     const data = await res.json();
 
@@ -286,19 +287,7 @@ async function loadCandidates(){
 async function vote(electionId, candidateId){
 
   try{
-    const wallet = await signer.getAddress();
-
-    const aadhaar = document.getElementById("voterIdInput").value.trim().toLowerCase();
-
-    let isReg = await contract.isRegistered(electionId, wallet);
-
-    if(!isReg){
-      const hashed = ethers.keccak256(ethers.toUtf8Bytes(aadhaar));
-      const tx1 = await contract.register(electionId, hashed);
-      await tx1.wait();
-    }
-
-    const voted = await contract.hasAlreadyVoted(electionId, wallet);
+    const voted = await contract.hasAlreadyVoted(electionId, await signer.getAddress());
 
     if(voted){
       return output("❌ Already voted");
@@ -313,12 +302,7 @@ async function vote(electionId, candidateId){
 
   }catch(err){
     console.error(err);
-
-    if(err.reason){
-      return output("❌ " + err.reason);
-    }
-
-    output("❌ Transaction failed");
+    output("❌ " + (err.reason || "Transaction failed"));
   }
 }
 

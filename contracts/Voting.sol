@@ -94,25 +94,43 @@ contract Voting {
     // USER FUNCTIONS
     // ======================
 
-    function register(uint _electionId, bytes32 _hashedId) public {
+function register(uint _electionId, bytes32 _hashedId) public {
 
-        require(validVoterId[_electionId][_hashedId], "Not whitelisted");
+    require(msg.sender == admin, "Only backend can register");
 
-        // 🔥 ONE WALLET PER ELECTION
-        require(
-            registeredVoterId[_electionId][msg.sender] == bytes32(0),
-            "Already registered"
-        );
+    require(validVoterId[_electionId][_hashedId], "Not whitelisted");
 
-        // 🔥 ONE AADHAAR PER ELECTION
-        require(
-            !voterIdUsed[_electionId][_hashedId],
-            "Aadhaar already used"
-        );
+    require(
+        !voterIdUsed[_electionId][_hashedId],
+        "Aadhaar already used"
+    );
 
-        registeredVoterId[_electionId][msg.sender] = _hashedId;
-        voterIdUsed[_electionId][_hashedId] = true;
-    }
+    // 🔥 store mapping (wallet must be passed now)
+    revert("Use registerFromBackend");
+}
+
+// ✅ NEW FUNCTION
+function registerFromBackend(
+    uint _electionId,
+    address user,
+    bytes32 _hashedId
+) public onlyAdmin {
+
+    require(validVoterId[_electionId][_hashedId], "Not whitelisted");
+
+    require(
+        registeredVoterId[_electionId][user] == bytes32(0),
+        "Already registered"
+    );
+
+    require(
+        !voterIdUsed[_electionId][_hashedId],
+        "Aadhaar already used"
+    );
+
+    registeredVoterId[_electionId][user] = _hashedId;
+    voterIdUsed[_electionId][_hashedId] = true;
+}
 
     function vote(uint _electionId, uint _candidateId) public {
 
