@@ -22,7 +22,7 @@
   ====================== */
 
   // 🔥 MUST be Ganache/Hardhat PRIVATE KEY
-  const ADMIN_PRIVATE_KEY = "0xac5b546493e463eb0c09f37401f1774fe80c3d3eb7429849f2c71670983c2e05";
+  const ADMIN_PRIVATE_KEY = "0x764f18ebbb2f40a56d3575e922091dacf66851f90b4e639850c75e43ce38ace5";
 
   const provider = new ethers.providers.JsonRpcProvider(
     "http://127.0.0.1:7545"
@@ -31,7 +31,7 @@
   const adminWallet = new ethers.Wallet(ADMIN_PRIVATE_KEY, provider);
 
   // 🔥 your deployed contract address
-  const contractAddress = "0x4CFcFc5edf595EFb354b1756747aE170f4614da5";
+  const contractAddress = "0xfc57abC11beC82d57134253f4B3c696cB965fDF6";
 
   const abi = [
     "function isWhitelisted(uint,bytes32) view returns(bool)",
@@ -51,8 +51,13 @@
     try {
       const { aadhaar, electionId } = req.body;
 
-      if (!aadhaar || electionId === undefined) {
+      if (!aadhaar || electionId === undefined || electionId === null || electionId === "") {
         return res.json({ success: false, message: "Missing fields" });
+      }
+
+      const normalizedElectionId = Number(electionId);
+      if (!Number.isInteger(normalizedElectionId) || normalizedElectionId < 0) {
+        return res.json({ success: false, message: "Invalid election selection" });
       }
 
       const clean = String(aadhaar).trim().toLowerCase();
@@ -62,7 +67,7 @@
       );
 
       // 🔥 Check whitelist from blockchain
-      const allowed = await contract.isWhitelisted(electionId, hash);
+      const allowed = await contract.isWhitelisted(normalizedElectionId, hash);
 
       if (!allowed) {
         return res.json({
@@ -124,6 +129,21 @@
         });
       }
 
+      if (electionId === undefined || electionId === null || electionId === "") {
+        return res.json({
+          success: false,
+          message: "Election required"
+        });
+      }
+
+      const normalizedElectionId = Number(electionId);
+      if (!Number.isInteger(normalizedElectionId) || normalizedElectionId < 0) {
+        return res.json({
+          success: false,
+          message: "Invalid election selection"
+        });
+      }
+
       const clean = String(aadhaar).trim().toLowerCase();
 
       // 🔥 Verify OTP
@@ -147,7 +167,7 @@
 
       // 🔥 Register on blockchain (ADMIN signs this)
       const tx = await contract.registerFromBackend(
-        electionId,
+        normalizedElectionId,
         wallet,
         hash
       );

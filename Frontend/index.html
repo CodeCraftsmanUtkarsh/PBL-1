@@ -1,50 +1,417 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Blockchain Voting System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>National Digital Voting Portal</title>
   <style>
+    :root {
+      --ink: #10233b;
+      --ink-soft: #37506d;
+      --surface-strong: #fffdf8;
+      --panel: rgba(255, 253, 248, 0.9);
+      --border: rgba(16, 35, 59, 0.14);
+      --accent: #0d4c7d;
+      --accent-strong: #083455;
+      --accent-faint: rgba(13, 76, 125, 0.08);
+      --gold: #b78a2f;
+      --gold-soft: rgba(183, 138, 47, 0.18);
+      --shadow: 0 24px 60px rgba(16, 35, 59, 0.12);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+    }
+    * { box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin-top: 100px;
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Trebuchet MS", "Lucida Sans Unicode", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(183, 138, 47, 0.14), transparent 28%),
+        radial-gradient(circle at top right, rgba(13, 76, 125, 0.16), transparent 30%),
+        linear-gradient(180deg, #efe6d4 0%, #f7f3eb 48%, #efe8da 100%);
+      position: relative;
+      overflow-x: hidden;
     }
-
-    h1 {
-      margin-bottom: 40px;
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
     }
-
-    .btn {
-      padding: 15px 40px;
-      font-size: 18px;
-      margin: 20px;
+    body::before {
+      background:
+        linear-gradient(90deg, rgba(16, 35, 59, 0.035) 1px, transparent 1px),
+        linear-gradient(rgba(16, 35, 59, 0.035) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.22), transparent 88%);
+    }
+    body::after {
+      background: radial-gradient(circle at center, rgba(255, 255, 255, 0.3), transparent 52%);
+      opacity: 0.65;
+    }
+    .shell {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 26px 0 44px;
+      position: relative;
+      z-index: 1;
+    }
+    .masthead {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+      border: 1px solid var(--border);
+      background: rgba(255, 251, 243, 0.7);
+      backdrop-filter: blur(10px);
+      padding: 18px 22px;
+      border-radius: var(--radius-lg);
+      box-shadow: 0 10px 30px rgba(16, 35, 59, 0.07);
+    }
+    .identity { display: flex; align-items: center; gap: 16px; }
+    .seal {
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      border: 2px solid rgba(183, 138, 47, 0.5);
+      background:
+        radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.9), transparent 35%),
+        linear-gradient(135deg, #c49b45, #8d6619);
+      box-shadow: inset 0 0 0 6px rgba(255, 253, 248, 0.36);
+      position: relative;
+    }
+    .seal::after {
+      content: "EC";
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #fffdf8;
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+    .eyebrow {
+      margin: 0 0 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      font-size: 0.72rem;
+      color: var(--ink-soft);
+    }
+    .title {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.5rem, 2vw, 2rem);
+      letter-spacing: 0.02em;
+    }
+    .meta {
+      text-align: right;
+      color: var(--ink-soft);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.25fr 0.95fr;
+      gap: 28px;
+      margin-top: 28px;
+    }
+    .hero-panel,
+    .notice-panel,
+    .path-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+    }
+    .hero-panel {
+      padding: 38px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-panel::before {
+      content: "";
+      position: absolute;
+      inset: auto -8% -34% auto;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(13, 76, 125, 0.16), transparent 65%);
+    }
+    .hero h1 {
+      margin: 10px 0 16px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.6rem, 4.8vw, 4.8rem);
+      line-height: 0.98;
+      max-width: 10ch;
+    }
+    .hero-copy {
+      max-width: 58ch;
+      color: var(--ink-soft);
+      font-size: 1.03rem;
+      line-height: 1.8;
+      margin-bottom: 28px;
+    }
+    .trust-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .trust-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: var(--surface-strong);
+      border: 1px solid rgba(16, 35, 59, 0.1);
+      color: var(--ink);
+      font-size: 0.92rem;
+    }
+    .trust-pill::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #2a8f5a, #156743);
+      box-shadow: 0 0 0 4px rgba(42, 143, 90, 0.12);
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .action-btn {
+      appearance: none;
+      border: 0;
       cursor: pointer;
-      border-radius: 8px;
-      border: 1px solid #333;
+      border-radius: 16px;
+      padding: 15px 22px;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
     }
-
-    .btn:hover {
-      background-color: #f0f0f0;
+    .action-btn:hover { transform: translateY(-2px); }
+    .action-btn.primary {
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      box-shadow: 0 14px 28px rgba(13, 76, 125, 0.28);
+    }
+    .action-btn.secondary {
+      color: var(--ink);
+      background: linear-gradient(180deg, #fffefb, #efe7d7);
+      border: 1px solid rgba(16, 35, 59, 0.1);
+      box-shadow: 0 10px 22px rgba(16, 35, 59, 0.08);
+    }
+    .notice-panel {
+      padding: 26px;
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+    .notice-card {
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(16, 35, 59, 0.08);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 240, 230, 0.95));
+      padding: 20px;
+    }
+    .notice-card h2,
+    .path-card h2 {
+      margin: 0 0 12px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.28rem;
+    }
+    .notice-card p,
+    .path-card p {
+      margin: 0;
+      line-height: 1.7;
+      color: var(--ink-soft);
+    }
+    .bullet-list {
+      list-style: none;
+      padding: 0;
+      margin: 14px 0 0;
+      display: grid;
+      gap: 10px;
+      color: var(--ink);
+    }
+    .bullet-list li {
+      position: relative;
+      padding-left: 22px;
+      line-height: 1.6;
+    }
+    .bullet-list li::before {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 0;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--gold);
+      box-shadow: 0 0 0 5px var(--gold-soft);
+    }
+    .paths {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+      margin-top: 28px;
+    }
+    .path-card {
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .path-card::after {
+      content: "";
+      position: absolute;
+      right: -40px;
+      top: -40px;
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(13, 76, 125, 0.12), transparent 68%);
+    }
+    .path-tag {
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-faint);
+      color: var(--accent-strong);
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      font-weight: 700;
+    }
+    .path-btn { margin-top: 22px; width: 100%; }
+    .footer-note {
+      margin-top: 22px;
+      text-align: center;
+      color: var(--ink-soft);
+      font-size: 0.92rem;
+      line-height: 1.7;
+    }
+    @media (max-width: 900px) {
+      .hero,
+      .paths { grid-template-columns: 1fr; }
+      .masthead { flex-direction: column; align-items: flex-start; }
+      .meta { text-align: left; }
+      .hero-panel { padding: 30px 24px; }
+    }
+    @media (max-width: 640px) {
+      .shell { width: min(100% - 24px, 1180px); }
+      .actions { flex-direction: column; }
+      .action-btn { width: 100%; }
     }
   </style>
 </head>
-
 <body>
+  <div class="shell">
+    <header class="masthead">
+      <div class="identity">
+        <div class="seal" aria-hidden="true"></div>
+        <div>
+          <p class="eyebrow">Election Commission Digital Services</p>
+          <h2 class="title">National Digital Voting Portal</h2>
+        </div>
+      </div>
+      <div class="meta">
+        Secure civic access point<br />
+        Blockchain-backed election records
+      </div>
+    </header>
 
-<h1>Blockchain Voting System</h1>
+    <section class="hero">
+      <article class="hero-panel">
+        <p class="eyebrow">Trusted Electronic Ballot Interface</p>
+        <h1>Cast and manage elections with confidence.</h1>
+        <p class="hero-copy">
+          This portal is designed to mirror the tone and rigor of an official government service.
+          Administrative actions are signed by an authorized wallet, while citizens verify identity
+          before accessing live ballots.
+        </p>
+        <div class="trust-row">
+          <span class="trust-pill">Wallet-authenticated actions</span>
+          <span class="trust-pill">Identity verification workflow</span>
+          <span class="trust-pill">Tamper-evident vote records</span>
+        </div>
+        <div class="actions">
+          <a class="action-btn primary" href="./Frontend/voter.html" data-nav="voter.html">Enter Voter Services</a>
+          <a class="action-btn secondary" href="./Frontend/admin.html" data-nav="admin.html">Open Election Administration</a>
+        </div>
+      </article>
 
-<button onclick="location.href='admin.html'">Admin Panel</button>
-<button onclick="location.href='voter.html'">Voter Panel</button>
+      <aside class="notice-panel">
+        <section class="notice-card">
+          <h2>Before You Proceed</h2>
+          <p>
+            Keep your registered identity details ready, ensure your wallet is accessible,
+            and only continue from a trusted device during the election period.
+          </p>
+          <ul class="bullet-list">
+            <li>Use the voter portal to request verification and access active ballots.</li>
+            <li>Use the admin portal only from an authorized election management wallet.</li>
+            <li>All transactions are subject to blockchain confirmation.</li>
+          </ul>
+        </section>
+        <section class="notice-card">
+          <h2>Service Integrity</h2>
+          <p>
+            The interface uses a restrained visual language, strong hierarchy, and formal messaging
+            so users feel the seriousness of an election workflow from the first screen.
+          </p>
+        </section>
+      </aside>
+    </section>
 
-<script>
-function goAdmin(){
-  window.location.href = "admin.html";
-}
+    <section class="paths">
+      <article class="path-card">
+        <span class="path-tag">Citizen Access</span>
+        <h2>Voter Verification and Ballot Access</h2>
+        <p>
+          Connect your wallet, verify identity through the authorized process, review active elections,
+          and submit your vote with a clear confirmation trail.
+        </p>
+        <a class="action-btn primary path-btn" href="./Frontend/voter.html" data-nav="voter.html">Proceed to Voter Panel</a>
+      </article>
+      <article class="path-card">
+        <span class="path-tag">Election Operations</span>
+        <h2>Administrator Control Console</h2>
+        <p>
+          Create elections, register candidate rosters, whitelist eligible voter identifiers,
+          and monitor the current ballot setup from the official control surface.
+        </p>
+        <a class="action-btn secondary path-btn" href="./Frontend/admin.html" data-nav="admin.html">Proceed to Admin Panel</a>
+      </article>
+    </section>
 
-function goVoter(){
-  window.location.href = "voter.html";
-}
-</script>
+    <p class="footer-note">
+      By continuing, you acknowledge that election operations are audited, wallet-signed, and intended for official use only.
+    </p>
+  </div>
+  <script>
+    function resolveNavTarget(target) {
+      const inFrontendDir = window.location.pathname.includes("/Frontend/");
+      return inFrontendDir ? target : `Frontend/${target}`;
+    }
 
+    document.querySelectorAll("[data-nav]").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        const target = event.currentTarget.getAttribute("data-nav");
+        if (!target) return;
+        event.preventDefault();
+        window.location.assign(new URL(resolveNavTarget(target), window.location.href).toString());
+      });
+    });
+  </script>
 </body>
 </html>
